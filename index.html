@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>單車環島分享牆</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #f4f4f4; display: flex; }
+    .sidebar {
+      width: 220px;
+      background-color: #333;
+      color: white;
+      padding: 20px 10px;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+    .sidebar h2 { text-align: center; font-size: 18px; margin-bottom: 20px; }
+    .sidebar .tab {
+      padding: 10px 15px;
+      margin: 5px;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #444;
+    }
+    .sidebar .tab.active { background: #4CAF50; color: white; }
+
+    .main {
+      flex: 1;
+      padding: 20px;
+      box-sizing: border-box;
+      overflow-y: auto;
+    }
+    .post-box { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .post-box input, .post-box textarea, .post-box select {
+      width: 100%; padding: 10px; margin: 8px 0; border-radius: 6px; border: 1px solid #ccc;
+    }
+    .post-box button { padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    .post-box button:hover { background: #45a049; }
+    .preview-img { max-width: 100%; margin-top: 10px; border-radius: 8px; }
+
+    .post { background: white; margin-bottom: 15px; padding: 15px; border-radius: 10px; box-shadow: 0 1px 5px rgba(0,0,0,0.1); }
+    .post .meta { font-size: 14px; color: gray; margin-bottom: 8px; }
+    .post img { max-width: 100%; border-radius: 8px; margin-top: 10px; }
+
+    .group-section { margin-top: 20px; }
+    .group-title { font-weight: bold; font-size: 16px; color: #4CAF50; margin-bottom: 10px; }
+
+    .reply-section { margin-top: 10px; padding-left: 20px; }
+    .reply { background: #f0f0f0; padding: 10px; border-radius: 8px; margin-top: 5px; font-size: 14px; }
+
+    .pagination {
+      margin-top: 20px;
+      text-align: center;
+    }
+    .pagination button {
+      padding: 6px 12px;
+      margin: 0 5px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #f0f0f0;
+      cursor: pointer;
+    }
+    .pagination button:hover { background: #4CAF50; color: white; }
+
+    .heart { cursor: pointer; color: #ff4d4d; }
+    .heart.liked { color: #ff0000; }
+    .heart-count { font-size: 14px; color: gray; margin-left: 5px; }
+  </style>
+</head>
+<body>
+  <div class="sidebar" id="sidebar"></div>
+  <div class="main">
+    <div id="postBox" class="post-box" style="display:none">
+      <input id="name" placeholder="你的名字" />
+      <textarea id="message" placeholder="分享你的內容..."></textarea>
+      <input type="file" id="imageFile" accept="image/*" />
+      <img id="preview" class="preview-img" style="display:none" />
+      <select id="group">
+        <option value="第一梯A組">第一梯A組</option>
+        <option value="第一梯B組">第一梯B組</option>
+        <option value="第二梯A組">第二梯A組</option>
+        <option value="第二梯B組">第二梯B組</option>
+        <option value="第三梯A組">第三梯A組</option>
+        <option value="第三梯B組">第三梯B組</option>
+        <option value="第四梯A組">第四梯A組</option>
+        <option value="第四梯B組">第四梯B組</option>
+        <option value="主辦單位">主辦單位</option>
+      </select>
+      <select id="page">
+        <option value="重要公告">重要公告</option>
+        <option value="集體團練時刻">集體團練時刻</option>
+        <option value="五月平日練習">五月平日練習</option>
+        <option value="六月平日練習">六月平日練習</option>
+        <option value="七月平日練習">七月平日練習</option>
+        <option value="八月平日練習">八月平日練習</option>
+        <option value="環島Day1">環島Day1</option>
+        <option value="環島Day2">環島Day2</option>
+        <option value="環島Day3">環島Day3</option>
+        <option value="環島Day4">環島Day4</option>
+        <option value="環島Day5">環島Day5</option>
+        <option value="環島Day6">環島Day6</option>
+        <option value="環島Day7">環島Day7</option>
+        <option value="環島Day8">環島Day8</option>
+      </select>
+      <button onclick="postMessage()">發佈</button>
+    </div>
+    <div id="wall"></div>
+    <div id="pagination" class="pagination"></div>
+  </div>
+
+  <script>
+    const pages = ["我有話想說", "重要公告", "集體團練時刻", "五月平日練習", "六月平日練習", "七月平日練習", "八月平日練習", "環島Day1", "環島Day2", "環島Day3", "環島Day4", "環島Day5", "環島Day6", "環島Day7", "環島Day8"];
+    const groups = ["第一梯A組", "第一梯B組", "第二梯A組", "第二梯B組", "第三梯A組", "第三梯B組", "第四梯A組", "第四梯B組", "主辦單位"];
+
+    let currentPage = "我有話想說";
+    const posts = [];
+
+    function renderSidebar() {
+      const sidebar = document.getElementById("sidebar");
+      sidebar.innerHTML = '<h2>分頁導覽</h2>';
+      pages.forEach(p => {
+        const tab = document.createElement('div');
+        tab.className = 'tab' + (p === currentPage ? ' active' : '');
+        tab.textContent = p;
+        tab.onclick = () => {
+          currentPage = p;
+          renderSidebar();
+          renderWall();
+          document.getElementById('postBox').style.display = p === "我有話想說" ? 'block' : 'none';
+        };
+        sidebar.appendChild(tab);
+      });
+    }
+
+    function postMessage() {
+      const name = document.getElementById("name").value;
+      const message = document.getElementById("message").value;
+      const group = document.getElementById("group").value;
+      const page = document.getElementById("page").value;
+      const imageInput = document.getElementById("imageFile");
+      const imageUrl = imageInput.files[0] ? URL.createObjectURL(imageInput.files[0]) : '';
+      if (!name || !message) return alert("請填寫名字與內容");
+
+      posts.push({ name, message, imageUrl, page, group, timestamp: new Date().toLocaleString(), replies: [], liked: 0 });
+
+      document.getElementById("name").value = '';
+      document.getElementById("message").value = '';
+      document.getElementById("imageFile").value = null;
+      document.getElementById("preview").style.display = 'none';
+
+      renderWall();
+    }
+
+    document.getElementById("imageFile").addEventListener("change", function(event) {
+      const file = event.target.files[0];
+      const preview = document.getElementById("preview");
+      if (file) {
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+      } else {
+        preview.src = '';
+        preview.style.display = 'none';
+      }
+    });
+
+    function toggleLike(postIndex) {
+      posts[postIndex].liked++;
+      renderWall();
+    }
+
+    function postReply(postIndex) {
+      const post = posts[postIndex];
+      const replyName = prompt("請輸入你的名字");
+      const replyMessage = prompt("請輸入回覆內容");
+
+      if (!replyName || !replyMessage) return alert("請填寫名字與回覆內容");
+
+      post.replies.push({ replyName, replyMessage, timestamp: new Date().toLocaleString() });
+      renderWall();
+    }
+
+    function renderWall() {
+      const wall = document.getElementById("wall");
+      wall.innerHTML = '';
+
+      if (currentPage === "我有話想說") return;
+
+      groups.forEach(group => {
+        const groupPosts = posts.filter(p => p.page === currentPage && p.group === group);
+        if (groupPosts.length > 0) {
+          const section = document.createElement('div');
+          section.className = 'group-section';
+          section.innerHTML = `<div class="group-title">${group}</div>`;
+
+          groupPosts.forEach((p, index) => {
+            const post = document.createElement('div');
+            post.className = 'post';
+            post.innerHTML = `<div class="meta">${p.name}｜${p.timestamp}</div><div>${p.message}</div>`;
+            if (p.imageUrl) {
+              post.innerHTML += `<img src="${p.imageUrl}" alt="圖片" />`;
+            }
+
+            post.innerHTML += `
+              <span class="heart ${p.liked > 0 ? 'liked' : ''}" onclick="toggleLike(${index})">❤️</span>
+              <span class="heart-count">${p.liked}</span>
+              <button onclick="postReply(${index})">回覆</button>
+            `;
+
+            const repliesSection = document.createElement('div');
+            repliesSection.className = 'replies';
+            p.replies.forEach(reply => {
+              const replyPost = document.createElement('div');
+              replyPost.className = 'reply';
+              replyPost.innerHTML = `<div><strong>${reply.replyName}</strong>｜${reply.timestamp}</div><div>${reply.replyMessage}</div>`;
+              repliesSection.appendChild(replyPost);
+            });
+
+            post.appendChild(repliesSection);
+            section.appendChild(post);
+          });
+
+          wall.appendChild(section);
+        }
+      });
+    }
+
+    renderSidebar();
+  </script>
+</body>
+</html>
